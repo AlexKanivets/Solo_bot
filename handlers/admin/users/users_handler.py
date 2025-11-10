@@ -585,9 +585,6 @@ async def handle_key_edit(
             tariff_name = row[0]
             subgroup_title = row[1] or "—"
 
-    # Статус заморозки
-    freeze_status = "❄️ Заморожена" if key_obj.is_frozen else "✅ Активна"
-
     text = (
         "<b>🔑 Информация о подписке</b>\n\n"
         "<blockquote>"
@@ -598,12 +595,11 @@ async def handle_key_edit(
         f"🆔 <b>ID клиента:</b> {key_obj.tg_id or '—'}\n"
         f"📁 <b>Группа:</b> {subgroup_title}\n"
         f"📦 <b>Тариф:</b> {tariff_name}\n"
-        f"📊 <b>Статус:</b> {freeze_status}\n"
         "</blockquote>"
     )
 
     if not update or not callback_data.edit:
-        await callback_query.message.edit_text(text=text, reply_markup=await build_key_edit_kb(key_obj.__dict__, email))
+        await callback_query.message.edit_text(text=text, reply_markup=build_key_edit_kb(key_obj.__dict__, email))
     else:
         await callback_query.message.edit_text(
             text=text,

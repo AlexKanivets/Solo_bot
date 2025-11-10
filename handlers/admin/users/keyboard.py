@@ -243,7 +243,7 @@ def build_user_key_kb(tg_id: int, email: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-async def build_key_edit_kb(key_details: dict, email: str) -> InlineKeyboardMarkup:
+def build_key_edit_kb(key_details: dict, email: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.button(
@@ -281,15 +281,6 @@ async def build_key_edit_kb(key_details: dict, email: str) -> InlineKeyboardMark
                 action="users_hwid_menu", data=email, tg_id=key_details["tg_id"]
             ).pack(),
         )
-
-    # Добавляем кнопки из модулей через хуки
-    module_buttons = await run_hooks(
-        "admin_key_edit",
-        email=email,
-        tg_id=key_details["tg_id"],
-        is_frozen=key_details.get("is_frozen", False)
-    )
-    builder = insert_hook_buttons(builder, module_buttons)
 
     builder.row(build_editor_back_btn(key_details["tg_id"], True))
     builder.adjust(1)
