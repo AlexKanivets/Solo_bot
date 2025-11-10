@@ -2,17 +2,72 @@ from typing import Any
 
 from aiogram.types import InlineKeyboardButton
 
-from hooks.hooks import register_hook
 from logger import logger
 
 
 def register_admin_subscription_toggle_hooks():
     """
-    Регистрирует хуки для добавления кнопки управления заморозкой подписки
-    в админское меню редактирования ключа.
+    Регистрирует хуки и применяет monkey patching для добавления кнопки управления 
+    заморозкой подписки в админское меню редактирования ключа.
+    
+    ВАЖНО: Использует monkey patching для избежания изменения исходных файлов handlers/.
     """
-    register_hook("admin_key_edit", on_admin_key_edit)
-    logger.info("[AdminSubscriptionToggle] Хуки модуля зарегистрированы")
+    logger.info("[AdminSubscriptionToggle] Применение monkey patching...")
+    
+    try:
+        # Импортируем необходимые модули
+        from handlers.admin.users import keyboard as keyboard_module
+        from hooks.hooks import run_hooks
+        from hooks.hook_buttons import insert_hook_buttons
+        
+        # Сохраняем оригинальную функцию
+        original_build_key_edit_kb = keyboard_module.build_key_edit_kb
+        
+        # Создаем обертку с поддержкой хуков
+        def patched_build_key_edit_kb(key_details: dict, email: str):
+            """
+            Обертка для build_key_edit_kb с поддержкой хуков модулей.
+            Добавляет кнопки из модулей через систему хуков.
+            """
+            # Вызываем оригинальную функцию
+            builder_markup = original_build_key_edit_kb(key_details, email)
+            
+            # Получаем builder из markup
+            from aiogram.utils.keyboard import InlineKeyboardBuilder
+            from aiogram.types import InlineKeyboardMarkup
+            builder = InlineKeyboardBuilder.from_markup(builder_markup)
+            
+            # Синхронно вызываем хуки (создаем event loop если нужно)
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            # Получаем кнопки из модулей
+            module_buttons = loop.run_until_complete(run_hooks(
+                "admin_key_edit",
+                email=email,
+                tg_id=key_details["tg_id"],
+                is_frozen=key_details.get("is_frozen", False)
+            ))
+            
+            # Вставляем кнопки из модулей
+            builder = insert_hook_buttons(builder, module_buttons)
+            
+            return builder.as_markup()
+        
+        # Заменяем функцию на пропатченную версию
+        keyboard_module.build_key_edit_kb = patched_build_key_edit_kb
+        
+        logger.info("[AdminSubscriptionToggle] ✅ Monkey patching успешно применен")
+        logger.info("[AdminSubscriptionToggle] Хуки модуля зарегистрированы")
+        
+    except Exception as e:
+        logger.error(f"[AdminSubscriptionToggle] ❌ Ошибка при применении monkey patching: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 async def on_admin_key_edit(**kwargs) -> dict[str, Any] | None:
@@ -72,5 +127,5 @@ async def on_admin_key_edit(**kwargs) -> dict[str, Any] | None:
         return None
 
 
-# Автоматическая регистрация хуков при импорте модуля
+# Автоматическая регистрация хуков и применение monkey patching при импорте модуля
 register_admin_subscription_toggle_hooks()
